@@ -1,0 +1,590 @@
+{
+  "name": "Placidway",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1136,
+        -240
+      ],
+      "id": "0f076e0a-ceba-4deb-b498-b1350d61aa7c",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        160
+      ],
+      "id": "30b9138e-6c6e-40a2-b94a-0c29ce20a770",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://www.placidway.com/robots.txt",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -976,
+        0
+      ],
+      "id": "3265f01c-d82f-4cd4-9095-98b0ede87c5e",
+      "name": "Fetch PlacidWay Sitemap"
+    },
+    {
+      "parameters": {
+        "url": "https://www.placidway.com/sitemap.xml",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -848,
+        -208
+      ],
+      "id": "094bb0c7-f9d1-4396-a36a-a0b214a028ad",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($input.first().json.data ?? '');\n\nconst urls = [...raw.matchAll(/<loc>\\s*(https:\\/\\/www\\.placidway\\.com\\/[^<]+)<\\/loc>/g)]\n  .map(match => match[1].trim());\n\nreturn urls.map(url => ({\n  json: { sitemapUrl: url }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        240
+      ],
+      "id": "4832b206-1882-4de8-988f-e88a9047ebf7",
+      "name": "Extract Sitemap URLs"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.sitemapUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -752,
+        0
+      ],
+      "id": "f4279ecc-b9a3-49f0-b8e7-4da7c2cc23ba",
+      "name": "Fetch Content Sitemap"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($input.first().json.data ?? '');\n\nconst urls = [...raw.matchAll(/<url>[\\s\\S]*?<loc>\\s*(https:\\/\\/www\\.placidway\\.com\\/[^<]+)<\\/loc>([\\s\\S]*?)<\\/url>/g)];\n\nreturn urls.map(match => {\n  const block = match[0];\n  const url = match[1].trim();\n  const imageMatch = block.match(/<image:loc>\\s*([\\s\\S]*?)\\s*<\\/image:loc>/);\n\n  return {\n    json: {\n      url,\n      image: imageMatch ? imageMatch[1].trim() : ''\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        -256
+      ],
+      "id": "c2ddf60d-6851-414d-93f2-d8f870a6368c",
+      "name": "Extract Page URLs"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bece5006-d760-449d-89ec-59b5436a87f7",
+              "leftValue": "={{ $json.url }}",
+              "rightValue": "learning-center",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -512,
+        224
+      ],
+      "id": "c082a21d-a8d1-4990-81d6-efda3bfcb795",
+      "name": "Check Learning Center URL"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -432,
+        0
+      ],
+      "id": "c98c31ba-3cb9-4b0b-aea6-b7fb9adcdbb3",
+      "name": "Fetch Page Content"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "title"
+            },
+            {
+              "key": "summary",
+              "cssSelector": "meta[name=\"description\"]",
+              "returnValue": "attribute",
+              "attribute": "content"
+            },
+            {
+              "key": "image",
+              "cssSelector": "meta[property=\"og:image\"]",
+              "returnValue": "attribute",
+              "attribute": "content"
+            },
+            {
+              "key": "url",
+              "cssSelector": "link[rel=\"canonical\"]",
+              "returnValue": "attribute",
+              "attribute": "href"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -272,
+        -272
+      ],
+      "id": "23de0e85-d432-48ed-b6b2-86b582e00bc5",
+      "name": "Extract Page Details"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    title: $json.title || '',\n    url: $json.url || '',\n    summary: $json.summary || '',\n    image: $json.image || ''\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        -288
+      ],
+      "id": "8bc2046e-e18f-44d8-82a7-fc3a2ac830d4",
+      "name": "Prepare Content for AI"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a Facebook post using the following PlacidWay page information.\n\nTitle: {{ $json.title }}\nSummary: {{ $json.summary }}\nURL: {{ $json.url }}\n\nRequirements:\n- Write an engaging, professional Facebook post under 500 characters, excluding the URL.\n- Start with an interesting hook.\n- Explain the value of the page using only the supplied information.\n- Include a clear call to action.\n- Include the provided URL.\n- Add 3–5 relevant hashtags.\n- Do not make medical claims, promise outcomes, invent prices, or add unsupported facts.\n- Return only the final Facebook post text.",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -144,
+        -48
+      ],
+      "id": "955a2f94-e945-4d51-a25d-4b88d1f50211",
+      "name": "Generate Facebook Post"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const title = $json.title || '';\nconst url = $json.url || '';\nconst summary = $json.summary || '';\nconst image = $json.image || '';\n\nconst post = `🌍 Discover insights from PlacidWay!\n\n${title}\n\n${summary}\n\nLearn more here: ${url}\n\n#PlacidWay #MedicalTourism #HealthcareInsights`;\n\nreturn {\n  json: {\n    title,\n    url,\n    summary,\n    image,\n    post\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        144
+      ],
+      "id": "a51af9d7-ca56-45fb-a32f-a2c79991a4d4",
+      "name": "Prepare Facebook Post"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        144
+      ],
+      "id": "a2a34123-ec0d-4d37-8cb2-79fd4aa9e873",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const postText = $json.text || '';\n\nreturn {\n  json: {\n    status: \"TEST_READY\",\n    platform: \"Facebook\",\n    post_text: postText,\n    page_url: postText.match(/https?:\\/\\/\\S+/)?.[0] || '',\n    image_url: '',\n    published: false,\n    message: \"Test successful. Facebook access token is required for actual publishing.\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -48
+      ],
+      "id": "9b5376ca-a6a4-419e-b9d8-36a74fa042a9",
+      "name": "Test Facebook Post"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "s",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now }}",
+            "Title": "PlacidWay Learning Center",
+            "URL": "={{ $('Prepare Content for AI').first().json.url }}",
+            "Post Text": "={{ $('Generate Facebook Post').first().json.text }}",
+            "Image URL": "={{ $('Prepare Content for AI').first().json.image }}",
+            "Status": "TEST_READY"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Post Text",
+              "displayName": "Post Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Image URL",
+              "displayName": "Image URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Facebook Post ID",
+              "displayName": "Facebook Post ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        -48
+      ],
+      "id": "79897755-8029-42bf-8dcf-3cd6c7667af9",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Fetch PlacidWay Sitemap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch PlacidWay Sitemap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch PlacidWay Sitemap": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Extract Sitemap URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Sitemap URLs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Content Sitemap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Content Sitemap": {
+      "main": [
+        [
+          {
+            "node": "Extract Page URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Page URLs": {
+      "main": [
+        [
+          {
+            "node": "Check Learning Center URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Learning Center URL": {
+      "main": [
+        [
+          {
+            "node": "Fetch Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Page Content": {
+      "main": [
+        [
+          {
+            "node": "Extract Page Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Page Details": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Content for AI": {
+      "main": [
+        [
+          {
+            "node": "Prepare Facebook Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Facebook Post": {
+      "main": [
+        [
+          {
+            "node": "Generate Facebook Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Facebook Post",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Facebook Post": {
+      "main": [
+        [
+          {
+            "node": "Test Facebook Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Facebook Post": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "32400bd1-a0b6-41c1-a495-50b9ad964a90",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": ""
+  },
+  "nodeGroups": [],
+  "id": "H2fRthk66Fqvpqfd",
+  "tags": []
+}
